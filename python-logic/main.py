@@ -54,9 +54,10 @@ class NeuralNetwork:
         for layer in reversed(self.layers):
             grad_output = layer.backward(grad_output)
 
-    def fit(self, X, y, epochs=10, batch_size=32):
+    def fit(self, X, y, epochs=10, batch_size=32, callbacks=None):
         history = []
         loader = DataLoader(X, y, batch_size)
+        callbacks = callbacks or []
         
         for epoch in range(epochs):
             epoch_loss = 0
@@ -71,7 +72,18 @@ class NeuralNetwork:
                 self.optimizer.step(self.layers)
                 batches += 1
                 
-            history.append(float(epoch_loss / batches))
+            avg_loss = float(epoch_loss / batches)
+            history.append(avg_loss)
+            logs = {'loss': avg_loss}
+            stop = False
+            for cb in callbacks:
+                cb.on_epoch_end(epoch, logs)
+                if getattr(cb, 'stop_training', False):
+                    stop = True
+            
+            if stop:
+                break
+                
         return history
 
 def get_dummy_data(dataset_name):
