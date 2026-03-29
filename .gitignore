@@ -1,10 +1,11 @@
 venv/
-**/venv/
 env/
-.env/
-
+.env
 __pycache__/
-**/__pycache__/
 *.py[cod]
+*$py.class
 
+*.pkl
+.idea/
+.vscode/
 .DS_Store
