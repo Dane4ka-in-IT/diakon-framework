@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: nocode_db_container
+    restart: always
+    environment:
+      POSTGRES_DB: nocode_db
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "6666:5432"
+    volumes:
+      - ./psql_db:/var/lib/postgresql/data
+      - ./init_db:/docker-entrypoint-initdb.d
+
