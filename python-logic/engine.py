@@ -41,3 +41,58 @@ class Sigmoid(Layer):
 
     def backward(self, grad_output):
         return grad_output * self.out * (1 - self.out)
+    
+    
+
+
+
+class Flatten(Layer):
+    def forward(self, x):
+        self.input_shape = x.shape
+        return x.reshape(x.shape[0], -1)
+
+    def backward(self, grad_output):
+        return grad_output.reshape(self.input_shape)
+
+class Conv2D(Layer):
+    def __init__(self, in_channels, out_channels, kernel_size):
+        self.k = kernel_size
+        self.in_c = in_channels
+        self.out_c = out_channels
+        self.w = np.random.randn(out_channels, in_channels, kernel_size, kernel_size) * 0.1
+        self.b = np.zeros((out_channels, 1))
+        self.grad_w = np.zeros_like(self.w)
+        self.grad_b = np.zeros_like(self.b)
+
+    def forward(self, x):
+        self.x = x
+        batch_size, in_c, h, w = x.shape
+        out_h = h - self.k + 1
+        out_w = w - self.k + 1
+        out = np.zeros((batch_size, self.out_c, out_h, out_w))
+        
+        for b in range(batch_size):
+            for c_out in range(self.out_c):
+                for i in range(out_h):
+                    for j in range(out_w):
+                        x_slice = self.x[b, :, i:i+self.k, j:j+self.k]
+                        out[b, c_out, i, j] = np.sum(x_slice * self.w[c_out]) + self.b[c_out, 0]
+        return out
+
+    def backward(self, grad_output):
+        batch_size, _, out_h, out_w = grad_output.shape
+        grad_in = np.zeros_like(self.x)
+        self.grad_w.fill(0)
+        self.grad_b.fill(0)
+
+        for b in range(batch_size):
+            for c_out in range(self.out_c):
+                for i in range(out_h):
+                    for j in range(out_w):
+                        x_slice = self.x[b, :, i:i+self.k, j:j+self.k]
+                        g = grad_output[b, c_out, i, j]
+                        self.grad_w[c_out] += x_slice * g
+                        self.grad_b[c_out, 0] += g
+                        grad_in[b, :, i:i+self.k, j:j+self.k] += self.w[c_out] * g
+                        
+        return grad_in
