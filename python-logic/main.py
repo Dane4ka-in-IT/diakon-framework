@@ -5,6 +5,9 @@ import uvicorn
 from engine import Dense, Relu, Sigmoid
 from losses import MSE, CrossEntropy
 from optimizers import SGD, MomentumSGD, GradClipper
+from sklearn.datasets import load_iris, load_digits
+from sklearn.preprocessing import OneHotEncoder, StandardScaler
+import pickle
 
 app = FastAPI()
 
@@ -21,6 +24,11 @@ class DataLoader:
         self.y = y
         self.batch_size = batch_size
         self.shuffle = shuffle
+        self.transform = None
+
+    def map(self, transform_func):
+        self.transform = transform_func
+        return self
 
     def __iter__(self):
         m = self.X.shape[0]
@@ -30,7 +38,13 @@ class DataLoader:
         
         for i in range(0, m, self.batch_size):
             batch_idx = indices[i:i + self.batch_size]
-            yield self.X[batch_idx], self.y[batch_idx]
+            X_batch = self.X[batch_idx]
+            y_batch = self.y[batch_idx]
+            
+            if self.transform:
+                X_batch, y_batch = self.transform(X_batch, y_batch)
+                
+            yield X_batch, y_batch
 
 class NeuralNetwork:
     def __init__(self):
@@ -80,31 +94,62 @@ class NeuralNetwork:
                 cb.on_epoch_end(epoch, logs)
                 if getattr(cb, 'stop_training', False):
                     stop = True
-            
             if stop:
                 break
-                
         return history
 
-def get_dummy_data(dataset_name):
+    def set_training(self, mode=True):
+        for layer in self.layers:
+            if hasattr(layer, 'training'):
+                layer.training = mode
+
+    def save_weights(self, filepath):
+        weights = []
+        for layer in self.layers:
+            layer_data = {}
+            if hasattr(layer, 'w'): layer_data['w'] = layer.w
+            if hasattr(layer, 'b'): layer_data['b'] = layer.b
+            if hasattr(layer, 'gamma'): layer_data['gamma'] = layer.gamma
+            if hasattr(layer, 'beta'): layer_data['beta'] = layer.beta
+            if hasattr(layer, 'running_mean'): layer_data['running_mean'] = layer.running_mean
+            if hasattr(layer, 'running_var'): layer_data['running_var'] = layer.running_var
+            weights.append(layer_data)
+        with open(filepath, 'wb') as f:
+            pickle.dump(weights, f)
+
+    def load_weights(self, filepath):
+        with open(filepath, 'rb') as f:
+            weights = pickle.load(f)
+        for layer, layer_data in zip(self.layers, weights):
+            if 'w' in layer_data: layer.w = layer_data['w']
+            if 'b' in layer_data: layer.b = layer_data['b']
+            if 'gamma' in layer_data: layer.gamma = layer_data['gamma']
+            if 'beta' in layer_data: layer.beta = layer_data['beta']
+            if 'running_mean' in layer_data: layer.running_mean = layer_data['running_mean']
+            if 'running_var' in layer_data: layer.running_var = layer_data['running_var']
+
+def get_real_data(dataset_name):
+    encoder = OneHotEncoder(sparse_output=False)
+    scaler = StandardScaler()
+    
     if dataset_name == "mnist":
-        X = np.random.randn(1000, 784)
-        y = np.zeros((1000, 10))
-        for i in range(1000):
-            y[i, np.random.randint(0, 10)] = 1
+        data = load_digits()
+        X = scaler.fit_transform(data.data)
+        y = encoder.fit_transform(data.target.reshape(-1, 1))
         return X, y
     elif dataset_name == "iris":
-        X = np.random.randn(150, 4)
-        y = np.zeros((150, 3))
-        for i in range(150):
-            y[i, np.random.randint(0, 3)] = 1
+        data = load_iris()
+        X = scaler.fit_transform(data.data)
+        y = encoder.fit_transform(data.target.reshape(-1, 1))
         return X, y
-    return np.random.randn(100, 10), np.random.randn(100, 2)
+        
+    X = np.random.randn(100, 10)
+    y = np.random.randn(100, 2)
+    return X, y
 
 @app.post("/train")
 def train_model(req: TrainRequest):
-    X, y = get_dummy_data(req.dataset)
-    
+    X, y = get_real_data(req.dataset)
     model = NeuralNetwork()
     
     in_features = X.shape[1]
@@ -116,7 +161,7 @@ def train_model(req: TrainRequest):
     out_features = y.shape[1]
     model.add(Dense(in_features, out_features))
     
-    if req.dataset == "mnist" or req.dataset == "iris":
+    if req.dataset in ["mnist", "iris"]:
         model.add(Sigmoid())
         loss = CrossEntropy()
     else:
@@ -125,9 +170,9 @@ def train_model(req: TrainRequest):
     if req.optimizer == "SGD":
         opt = SGD(req.learning_rate)
     elif req.optimizer == "Momentum":
-        opt = MomentumSGD(req.learning_rate)
+        opt = MomentumSGD(req.learning_rate, momentum=0.9)
     elif req.optimizer == "Clipping":
-        opt = GradClipper(SGD(req.learning_rate))
+        opt = GradClipper(SGD(req.learning_rate), clip_value=1.0)
     else:
         opt = SGD(req.learning_rate)
 
