@@ -2,6 +2,7 @@ package dev.diakon.nocodeplatform.service;
 
 import dev.diakon.nocodeplatform.entity.TrainingTask;
 import dev.diakon.nocodeplatform.entity.User;
+import dev.diakon.nocodeplatform.exeption.LimitException;
 import dev.diakon.nocodeplatform.repositiry.TrainingTaskRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -19,7 +20,7 @@ public class TrainingTaskService {
     public TrainingTask createAndStartTask(User user, AiClient.PyRequest req) {
 
         if (!user.getIsPremium() && req.getEpochs() > 20) {
-            throw new RuntimeException("Бесплатно только 20 эпох! Купите премиум.");
+            throw new LimitException("Бесплатно только 20 эпох! Купите премиум.");
         }
 
         TrainingTask trainingTask = new TrainingTask();

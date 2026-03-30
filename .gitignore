@@ -1,4 +1,6 @@
 venv/
+venv_*/
+.venv/
 env/
 .env
 __pycache__/
@@ -9,3 +11,6 @@ psql_db/
 .idea/
 .vscode/
 .DS_Store
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
