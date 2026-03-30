@@ -1,6 +1,5 @@
 package dev.diakon.nocodeplatform.service;
 
-import dev.diakon.nocodeplatform.entity.TrainingTask;
 import dev.diakon.nocodeplatform.entity.User;
 import dev.diakon.nocodeplatform.exeption.DuplicateEmailException;
 import dev.diakon.nocodeplatform.exeption.InvalidPassword;
@@ -10,7 +9,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 
-import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -40,6 +38,19 @@ public class UserService {
                         },
                         () -> {
                             throw new UserNotFound("Юзер отсутствует в базе данных.");
+                        }
+                );
+    }
+
+    public void togglePremium(Long userId) {
+        userRepository.findById(userId).
+                ifPresentOrElse(user -> {
+                        user.setIsPremium(!user.getIsPremium());
+                        userRepository.save(user);
+                        System.out.println("Статус премиума для " + user.getUserName() + " изменен на: " + user.getIsPremium());
+                        },
+                        () -> {
+                            throw new UserNotFound("Юзера не существует!");
                         }
                 );
     }
