@@ -28,18 +28,14 @@ public class UserService {
                         });
     }
 
-    public void loginUser(String email, String password){
-        userRepository.findByUserEmail(email)
-                .ifPresentOrElse(
-                        i -> {
-                            if (!passwordEncoder.matches(password, i.getUserPassword())){
-                                throw new InvalidPassword("Невалидный логин или пароль");
-                            };
-                        },
-                        () -> {
-                            throw new UserNotFound("Юзер отсутствует в базе данных.");
-                        }
-                );
+    public User loginUser(String email, String password){
+        User user = userRepository.findByUserEmail(email)
+                .orElseThrow(() -> new UserNotFound("Юзер отсутствует в базе данных."));
+
+        if (!passwordEncoder.matches(password, user.getUserPassword())){
+            throw new InvalidPassword("Невалидный логин или пароль");
+        }
+        return user;
     }
 
     public void togglePremium(Long userId) {

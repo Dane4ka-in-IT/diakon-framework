@@ -28,13 +28,13 @@ public class UserController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<@NonNull String> login(@RequestBody LoginRequest request) {
-        userService.loginUser(request.getEmail(), request.getPassword());
-        return ResponseEntity.ok("Вход выполнен успешно");
+    public ResponseEntity<@NonNull User> login(@RequestBody LoginRequest request) {
+        User user = userService.loginUser(request.getEmail(), request.getPassword());
+        return ResponseEntity.ok(user);
     }
 
     @PatchMapping("/{userId}/premium")
-    public ResponseEntity<String> upgradeToPremium(@PathVariable Long userId) {
+    public ResponseEntity<@NonNull String> upgradeToPremium(@PathVariable Long userId) {
         userService.togglePremium(userId);
         return ResponseEntity.ok("Статус премиума успешно обновлен!");
     }

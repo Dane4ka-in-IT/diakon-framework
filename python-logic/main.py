@@ -1,5 +1,6 @@
 import numpy as np
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import uvicorn
 from engine import Dense, Relu, Sigmoid
@@ -10,12 +11,19 @@ from sklearn.preprocessing import OneHotEncoder, StandardScaler
 import pickle
 
 app = FastAPI()
+app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+
+trained_models = {}
 
 class TrainRequest(BaseModel):
     layers: list[int]
     optimizer: str
     epochs: int
     learning_rate: float
+    dataset: str
+
+class PredictRequest(BaseModel):
+    features: list[float]
     dataset: str
 
 class DataLoader:
@@ -136,20 +144,20 @@ def get_real_data(dataset_name):
         data = load_digits()
         X = scaler.fit_transform(data.data)
         y = encoder.fit_transform(data.target.reshape(-1, 1))
-        return X, y
+        return X, y, scaler
     elif dataset_name == "iris":
         data = load_iris()
         X = scaler.fit_transform(data.data)
         y = encoder.fit_transform(data.target.reshape(-1, 1))
-        return X, y
+        return X, y, scaler
         
     X = np.random.randn(100, 10)
     y = np.random.randn(100, 2)
-    return X, y
+    return X, y, None
 
 @app.post("/train")
 def train_model(req: TrainRequest):
-    X, y = get_real_data(req.dataset)
+    X, y, scaler = get_real_data(req.dataset)
     model = NeuralNetwork()
     
     in_features = X.shape[1]
@@ -178,11 +186,43 @@ def train_model(req: TrainRequest):
 
     model.compile(loss, opt)
     history = model.fit(X, y, epochs=req.epochs, batch_size=32)
+
+    trained_models[req.dataset] = {"model": model, "scaler": scaler}
     
     return {
         "status": "success",
         "dataset": req.dataset,
         "history": history
+    }
+
+@app.post("/predict")
+def predict(req: PredictRequest):
+    if req.dataset not in trained_models:
+        return {"error": "Модель для этого датасета ещё не обучена"}
+
+    data = trained_models[req.dataset]
+    model = data["model"]
+    scaler = data["scaler"]
+
+    X = np.array([req.features])
+    if scaler:
+        X = scaler.transform(X)
+
+    model.set_training(False)
+    out = model.forward(X)
+    model.set_training(True)
+
+    predicted_class = int(np.argmax(out, axis=1)[0])
+    probabilities = out[0].tolist()
+
+    names = {"iris": ["setosa", "versicolor", "virginica"],
+             "mnist": [str(i) for i in range(10)]}
+    class_name = names.get(req.dataset, [str(predicted_class)])[predicted_class]
+
+    return {
+        "predicted_class": predicted_class,
+        "class_name": class_name,
+        "probabilities": probabilities
     }
 
 if __name__ == "__main__":

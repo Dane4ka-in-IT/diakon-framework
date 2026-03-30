@@ -17,6 +17,7 @@ public class TrainingController {
 
     private final TrainingTaskService trainingTaskService;
     private final UserRepository userRepository;
+    private final AiClient aiClient;
 
     @PostMapping("/start")
     public ResponseEntity<@NonNull TrainingTask> startTask(
@@ -33,5 +34,15 @@ public class TrainingController {
     @GetMapping("/{taskId}")
     public ResponseEntity<@NonNull TrainingTask> checkStatus(@PathVariable Long taskId) {
         return ResponseEntity.ok(trainingTaskService.getTaskById(taskId));
+    }
+
+    @GetMapping("/user/{userId}")
+    public ResponseEntity<java.util.List<TrainingTask>> getTasksByUser(@PathVariable Long userId) {
+        return ResponseEntity.ok(trainingTaskService.getTasksByUserId(userId));
+    }
+
+    @PostMapping("/predict")
+    public ResponseEntity<AiClient.PredictResponse> predict(@RequestBody AiClient.PredictRequest request) {
+        return ResponseEntity.ok(aiClient.sendPredictRequest(request));
     }
 }

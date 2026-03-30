@@ -52,4 +52,8 @@ public class TrainingTaskService {
         return trainingTaskRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Задача не найдена"));
     }
+
+    public java.util.List<TrainingTask> getTasksByUserId(Long userId) {
+        return trainingTaskRepository.findAllByUser_Id(userId);
+    }
 }
