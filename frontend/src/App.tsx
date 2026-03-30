@@ -51,9 +51,16 @@ const CLASS_NAMES: Record<string, string[]> = {
   mnist: ['0','1','2','3','4','5','6','7','8','9'],
 };
 
-const getErrorMessage = (err: any): string => {
+const getErrorMessage = (err: any, endpoint?: string): string => {
   if (err.response?.data?.message) return err.response.data.message;
-  if (err.response?.data && typeof err.response.data === 'string') return err.response.data;
+  if (err.response?.data && typeof err.response.data === 'string' && !err.response.data.includes('<html')) return err.response.data;
+  
+  if (err.response?.status === 400 || err.response?.status === 500) {
+    if (endpoint === 'login') return 'Неверный email или пароль';
+    if (endpoint === 'register') return 'Пользователь с таким Email уже существует';
+    if (endpoint === 'start') return 'LIMIT_REACHED';
+  }
+  
   return err.message || 'Произошла ошибка';
 };
 
@@ -94,7 +101,7 @@ function LoginPage({ onLogin, notify }: { onLogin: (user: UserData) => void, not
         onLogin(res.data);
       }
     } catch (err: any) {
-      setError(getErrorMessage(err));
+      setError(getErrorMessage(err, isRegister ? 'register' : 'login'));
     } finally {
       setLoading(false);
     }
@@ -194,7 +201,40 @@ function ProbBars({ probabilities, dataset }: { probabilities: number[]; dataset
   );
 }
 
-function Dashboard({ user, onLogout, notify }: { user: UserData; onLogout: () => void, notify: (msg: string, type: 'error' | 'success') => void }) {
+function PremiumModal({ user, onClose, onSuccess }: { user: UserData, onClose: () => void, onSuccess: () => void }) {
+  const [loading, setLoading] = useState(false);
+
+  const handleSubscribe = async () => {
+    setLoading(true);
+    try {
+      await axios.patch(`${API}/users/${user.id}/premium`);
+      onSuccess();
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="modal-overlay">
+      <div className="modal-content">
+        <h2 style={{ color: 'var(--accent-cyan)', marginBottom: '1rem', fontWeight: 700 }}>ПРО-ПОДПИСКА</h2>
+        <p style={{ marginBottom: '1.5rem', color: 'var(--text-muted)' }}>Бесплатно доступно только 20 эпох. Подпишитесь, чтобы снять все лимиты и получить доступ к максимальной производительности.</p>
+        <div className="premium-price-box">
+          <span style={{ fontSize: '1.2rem', fontWeight: 600, color: 'var(--text-main)' }}>PRO</span>
+          <span style={{ fontSize: '1.5rem', color: 'var(--accent-cyan)', fontWeight: 700 }}>400 ₽ <span style={{fontSize: '0.8rem', color: 'var(--text-muted)'}}>/ мес</span></span>
+        </div>
+        <div style={{ display: 'flex', gap: '1rem' }}>
+          <button className="btn btn-secondary btn-full" onClick={onClose} disabled={loading}>Позже</button>
+          <button className="btn btn-primary btn-full" onClick={handleSubscribe} disabled={loading}>{loading ? 'Оформляем...' : 'Подписаться'}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Dashboard({ user, onLogout, notify, onUpdateUser }: { user: UserData; onLogout: () => void, notify: (msg: string, type: 'error' | 'success') => void, onUpdateUser: (u: UserData) => void }) {
   const [config, setConfig] = useState<TrainingConfig>({
     dataset: 'iris', epochs: 10, learning_rate: 0.01, layers: [10, 5], optimizer: 'SGD'
   });
@@ -210,6 +250,7 @@ function Dashboard({ user, onLogout, notify }: { user: UserData; onLogout: () =>
   const [mnistPixels, setMnistPixels] = useState<number[]>(Array(64).fill(0));
   const [predictResult, setPredictResult] = useState<PredictResult | null>(null);
   const [predicting, setPredicting] = useState(false);
+  const [showPremiumModal, setShowPremiumModal] = useState(false);
 
   const activeTaskRef = useRef<number | null>(null);
 
@@ -242,7 +283,12 @@ function Dashboard({ user, onLogout, notify }: { user: UserData; onLogout: () =>
       pollStatus(res.data.id);
       fetchHistory();
     } catch (e: any) {
-      notify(getErrorMessage(e), 'error');
+      const msg = getErrorMessage(e, 'start');
+      if (msg === 'LIMIT_REACHED' || (config.epochs > 20 && !user.isPremium)) {
+        setShowPremiumModal(true);
+      } else {
+        notify(msg, 'error');
+      }
       setIsRunning(false); setTaskStatus('FAILED');
     }
   };
@@ -459,6 +505,18 @@ function Dashboard({ user, onLogout, notify }: { user: UserData; onLogout: () =>
           </div>
         </div>
       </div>
+      
+      {showPremiumModal && (
+        <PremiumModal 
+          user={user} 
+          onClose={() => setShowPremiumModal(false)}
+          onSuccess={() => {
+            setShowPremiumModal(false);
+            onUpdateUser({ ...user, isPremium: true });
+            notify('Подписка оформлена! Доступ ко всем ресурсам открыт.', 'success');
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -504,7 +562,7 @@ export default function App() {
       {!user ? (
         <LoginPage onLogin={handleLogin} notify={notify} />
       ) : (
-        <Dashboard user={user} onLogout={handleLogout} notify={notify} />
+        <Dashboard user={user} onLogout={handleLogout} notify={notify} onUpdateUser={handleLogin} />
       )}
     </>
   );
