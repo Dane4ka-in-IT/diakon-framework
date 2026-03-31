@@ -41,10 +41,15 @@ class Sigmoid(Layer):
 
     def backward(self, grad_output):
         return grad_output * self.out * (1 - self.out)
-    
-    
+        
+class Softmax(Layer):
+    def forward(self, x):
+        exps = np.exp(x - np.max(x, axis=1, keepdims=True))
+        self.out = exps / np.sum(exps, axis=1, keepdims=True)
+        return self.out
 
-
+    def backward(self, grad_output):
+        return grad_output * self.out * (1 - self.out)
 
 class Flatten(Layer):
     def forward(self, x):

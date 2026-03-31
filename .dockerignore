@@ -1,0 +1,9 @@
+**/venv
+**/venv_linux
+**/node_modules
+**/.idea
+**/.git
+**/target
+**/*.pyc
+**/psql_db
+**/db_data

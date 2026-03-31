@@ -533,7 +533,6 @@ export default function App() {
     const id = Date.now();
     setNotifications(prev => [...prev, { id, message, type }]);
     
-    // Auto-hide after 5s
     setTimeout(() => {
       setNotifications(prev => prev.map(n => n.id === id ? { ...n, hiding: true } : n));
       setTimeout(() => {

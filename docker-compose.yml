@@ -1,0 +1,49 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: nocode_db_container
+    restart: always
+    environment:
+      POSTGRES_DB: nocode_db
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "6666:5432"
+    volumes:
+      - ./java-backend/psql_db:/var/lib/postgresql/data
+      - ./java-backend/init_db:/docker-entrypoint-initdb.d
+
+  python-logic:
+    build:
+      context: ./python-logic
+    container_name: python-logic
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+
+  java-backend:
+    build:
+      context: ./java-backend
+    container_name: java-backend
+    network_mode: "service:python-logic"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/nocode_db
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+    depends_on:
+      - python-logic
+      - db
+
+  frontend:
+    build:
+      context: ./frontend
+    container_name: frontend
+    ports:
+      - "5173:5173"
+    environment:
+      VITE_BACKEND_URL: http://python-logic:1000
+    depends_on:
+      - java-backend

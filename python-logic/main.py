@@ -1,9 +1,10 @@
 import numpy as np
+from typing import List
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import uvicorn
-from engine import Dense, Relu, Sigmoid
+from engine import Dense, Relu, Sigmoid, Softmax
 from losses import MSE, CrossEntropy
 from optimizers import SGD, MomentumSGD, GradClipper
 from sklearn.datasets import load_iris, load_digits
@@ -16,14 +17,14 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], all
 trained_models = {}
 
 class TrainRequest(BaseModel):
-    layers: list[int]
+    layers: List[int]
     optimizer: str
     epochs: int
     learning_rate: float
     dataset: str
 
 class PredictRequest(BaseModel):
-    features: list[float]
+    features: List[float]
     dataset: str
 
 class DataLoader:
@@ -170,7 +171,7 @@ def train_model(req: TrainRequest):
     model.add(Dense(in_features, out_features))
     
     if req.dataset in ["mnist", "iris"]:
-        model.add(Sigmoid())
+        model.add(Softmax())
         loss = CrossEntropy()
     else:
         loss = MSE()
